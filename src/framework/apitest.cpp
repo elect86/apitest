@@ -24,6 +24,9 @@
 
 
 std::string asTable(BenchmarkResults _results);
+unsigned long long cpuStart, now, cpuTotal = 0, updateCounterStart = 0;
+int frames = 0;
+GLuint queryName = 0, gpuTotal = 0, gpuTime;
 
 // --------------------------------------------------------------------------------------------------------------------
 // --------------------------------------------------------------------------------------------------------------------
@@ -135,8 +138,37 @@ static void Render(Problem* _activeProblem, GfxBaseApi* _activeApi)
 
     _activeApi->Clear(clearColor, clearDepth);
 
+	if (queryName == 0) {
+		glGenQueries(1, &queryName);
+	}
     // This is the main entry point shared by all tests. 
-    _activeProblem->Render();
+	cpuStart = timer::Read();
+	{ 
+		glBeginQuery(GL_TIME_ELAPSED, queryName);
+		{
+			_activeProblem->Render();
+			frames++;
+		}
+		glEndQuery(GL_TIME_ELAPSED);
+
+		// Get the count of samples. 
+		// If the result of the query isn't here yet, we wait here...
+		glGetQueryObjectuiv(queryName, GL_QUERY_RESULT, &gpuTime);
+		gpuTotal += gpuTime;
+	}
+	cpuTotal += timer::Read() - cpuStart;
+	now = timer::Read();
+	if (timer::ToSec(now - updateCounterStart) > 1)
+	{
+		double cpu = timer::ToMSec(cpuTotal) / frames;
+		double gpu = double(gpuTotal) / double(1'000'000) / frames;
+		double fps = 1'000 / (double(gpuTotal) / 1'000'000 / frames);
+		printf("CPU time: %.3f, GPU time: %.3f, theor. FPS: %.3f\n", cpu, gpu, fps);
+		frames = 0;
+		cpuTotal = 0;
+		gpuTotal = 0;
+		updateCounterStart = now;
+	}
     
     // Present the results.
     _activeApi->SwapBuffers();
@@ -194,6 +226,8 @@ int main(int argc, char* argv[])
         return -1;
     }
 
+	updateCounterStart = timer::Read();
+
     ApplicationState* app = new ApplicationState(opts);
 
     bool shouldQuit = false;
@@ -208,8 +242,8 @@ int main(int argc, char* argv[])
             shouldQuit = shouldQuit || sdl_event.type == SDL_QUIT;
             OnEvent(&sdl_event, app);
         } else {
-            app->Update();
-            Render(app->GetActiveProblem(), app->GetActiveApi());
+			app->Update();
+			Render(app->GetActiveProblem(), app->GetActiveApi());
         }
     }
 

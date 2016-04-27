@@ -55,7 +55,8 @@ Options::Options()
 #if _OSX
     , InitialApi(GfxApiOpenGLCore::SGetShortName())
 #else
-    , InitialApi(GfxApiOpenGLGeneric::SGetShortName())
+    //, InitialApi(GfxApiOpenGLGeneric::SGetShortName())
+	, InitialApi(GfxApiOpenGLCore::SGetShortName())
 #endif
 {
 
